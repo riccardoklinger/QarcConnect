@@ -239,7 +239,7 @@
              <string>Double-click to see full record information</string>
             </property>
             <property name="editTriggers">
-             <set>QAbstractItemView::NoEditTriggers</set>
+             <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
             </property>
             <property name="alternatingRowColors">
              <bool>true</bool>
@@ -321,16 +321,16 @@
              <string>Add Data</string>
             </property>
             <property name="popupMode">
-             <enum>QToolButton::InstantPopup</enum>
+             <enum>QToolButton::ToolButtonPopupMode::InstantPopup</enum>
             </property>
             <property name="toolButtonStyle">
-             <enum>Qt::ToolButtonTextOnly</enum>
+             <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
             </property>
             <property name="autoRaise">
              <bool>false</bool>
             </property>
             <property name="arrowType">
-             <enum>Qt::NoArrow</enum>
+             <enum>Qt::ArrowType::NoArrow</enum>
             </property>
             <action name="mActionAddWms">
              <property name="icon">
@@ -407,84 +407,86 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="tabServers">
-      <attribute name="title">
-       <string>Services</string>
-      </attribute>
-      <layout class="QGridLayout" name="gridLayout">
-       <item row="0" column="0" colspan="5">
-        <widget class="QComboBox" name="cmbConnectionsServices"/>
-       </item>
-       <item row="1" column="0">
-        <widget class="QPushButton" name="btnServerInfo">
-         <property name="text">
-          <string>Service Info</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1" colspan="2">
-        <widget class="QPushButton" name="btnRawAPIResponse">
-         <property name="text">
-          <string>Raw API Response</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QPushButton" name="btnNew">
-         <property name="text">
-          <string>New…</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QPushButton" name="btnEdit">
-         <property name="text">
-          <string>Edit…</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
-        <widget class="QPushButton" name="btnDelete">
-         <property name="text">
-          <string>Delete…</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="4">
-        <widget class="QPushButton" name="btnSave">
-         <property name="text">
-          <string>Save…</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0" colspan="5">
-        <widget class="QTextBrowser" name="textMetadata">
-         <property name="openExternalLinks">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="3" colspan="2">
-        <widget class="QPushButton" name="btnAddDefault">
-         <property name="text">
-          <string>Add Default Services</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="3">
-        <widget class="QPushButton" name="btnLoad">
-         <property name="text">
-          <string>Load…</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
      <widget class="QWidget" name="tabSettings">
       <attribute name="title">
        <string>Settings</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_4">
+       <item>
+        <widget class="QGroupBox" name="groupBox_6">
+         <property name="title">
+          <string>Credentials</string>
+         </property>
+         <widget class="QLabel" name="label_14">
+          <property name="geometry">
+           <rect>
+            <x>10</x>
+            <y>31</y>
+            <width>195</width>
+            <height>24</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>User Name</string>
+          </property>
+         </widget>
+         <widget class="QLabel" name="label_15">
+          <property name="geometry">
+           <rect>
+            <x>10</x>
+            <y>70</y>
+            <width>195</width>
+            <height>16</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>Password</string>
+          </property>
+         </widget>
+         <widget class="QLineEdit" name="UserNameInput">
+          <property name="geometry">
+           <rect>
+            <x>210</x>
+            <y>30</y>
+            <width>251</width>
+            <height>22</height>
+           </rect>
+          </property>
+         </widget>
+         <widget class="QLineEdit" name="password_input">
+          <property name="geometry">
+           <rect>
+            <x>210</x>
+            <y>70</y>
+            <width>251</width>
+            <height>22</height>
+           </rect>
+          </property>
+          <property name="inputMethodHints">
+           <set>Qt::InputMethodHint::ImhHiddenText|Qt::InputMethodHint::ImhNoAutoUppercase|Qt::InputMethodHint::ImhNoPredictiveText|Qt::InputMethodHint::ImhSensitiveData</set>
+          </property>
+          <property name="echoMode">
+           <enum>QLineEdit::EchoMode::Password</enum>
+          </property>
+          <property name="clearButtonEnabled">
+           <bool>true</bool>
+          </property>
+         </widget>
+         <widget class="QCheckBox" name="show_password_checkbox">
+          <property name="geometry">
+           <rect>
+            <x>470</x>
+            <y>70</y>
+            <width>121</width>
+            <height>20</height>
+           </rect>
+          </property>
+          <property name="text">
+           <string>show password</string>
+          </property>
+         </widget>
+        </widget>
+       </item>
        <item>
         <widget class="QGroupBox" name="groupBox_4">
          <property name="title">
@@ -551,7 +553,7 @@
              <string>results at a time</string>
             </property>
             <property name="alignment">
-             <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+             <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
             </property>
            </widget>
           </item>
@@ -588,19 +590,6 @@
          </layout>
         </widget>
        </item>
-       <item>
-        <spacer name="verticalSpacer">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
       </layout>
      </widget>
     </widget>
@@ -608,10 +597,10 @@
    <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Orientation::Horizontal</enum>
      </property>
      <property name="standardButtons">
-      <set>QDialogButtonBox::Close|QDialogButtonBox::Help</set>
+      <set>QDialogButtonBox::StandardButton::Close|QDialogButtonBox::StandardButton::Help</set>
      </property>
     </widget>
    </item>
@@ -621,7 +610,7 @@
   <customwidget>
    <class>QgsFilterLineEdit</class>
    <extends>QLineEdit</extends>
-   <header>qgis.gui</header>
+   <header>qgsfilterlineedit.h</header>
   </customwidget>
  </customwidgets>
  <resources/>

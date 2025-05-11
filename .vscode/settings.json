@@ -1,0 +1,8 @@
+{
+  "python.pythonPath": "C:\\OSGeo4W\\apps\\Python312\\python.exe",
+  "python.analysis.extraPaths": [
+    "C:\\OSGeo4W\\apps\\qgis-qt6\\python",
+    "C:\\OSGeo4W\\apps\\Python312\\Lib\\site-packages"
+  ],
+  "python.envFile": "${workspaceFolder}/.env"
+}

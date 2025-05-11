@@ -21,22 +21,19 @@
 ###############################################################################
 
 import json
-import os.path
 from urllib.request import build_opener, install_opener, ProxyHandler
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (
     QDialog,
     QComboBox,
-    QDialogButtonBox,
     QMessageBox,
     QTreeWidgetItem,
     QWidget,
+    QLineEdit,
 )
-from qgis.PyQt.QtGui import QColor
-
 from qgis.core import (
-    Qgis,
+    # Qgis,
     QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
@@ -48,7 +45,7 @@ from qgis.core import (
     QgsRectangle,
     QgsSettingsTree,
 )
-from qgis.gui import QgsRubberBand, QgsGui
+from qgis.gui import QgsGui
 from qgis.utils import OverrideCursor
 
 try:
@@ -57,21 +54,16 @@ except ImportError:
     pass
 
 from QarcConnect import link_types
-from QarcConnect.dialogs.manageconnectionsdialog import ManageConnectionsDialog
-from QarcConnect.dialogs.newconnectiondialog import NewConnectionDialog
 from QarcConnect.dialogs.recorddialog import RecordDialog
-from QarcConnect.dialogs.apidialog import APIRequestResponseDialog
 from QarcConnect.search_backend import get_catalog_service
 from QarcConnect.util import (
     clean_ows_url,
-    get_connections_from_file,
     get_ui_class,
     get_help_url,
     normalize_text,
     open_url,
     render_template,
     serialize_string,
-    StaticContext,
 )
 
 BASE_CLASS = get_ui_class("maindialog.ui")
@@ -89,78 +81,19 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
         self.iface = iface
         self.map = iface.mapCanvas()
         self.settings = QgsSettings()
+        self.maxrecords = 100
+        self.timeout = 10
+        self.show_password_checkbox.stateChanged.connect(
+            self.toggle_password_visibility
+        )
+        self.startfrom = 1
         self.catalog = None
+        self.rubber_band = None
         self.catalog_url = None
         self.catalog_username = None
         self.catalog_password = None
-        self.catalog_type = None
-        self.context = StaticContext()
-
-        self.leKeywords.setShowSearchIcon(True)
-        self.leKeywords.setPlaceholderText(self.tr("Search keywords"))
-
-        self.setWindowTitle(self.tr("QarcConnect"))
-
-        self.rubber_band = QgsRubberBand(self.map, Qgis.GeometryType.Polygon)
-        self.rubber_band.setColor(QColor(255, 0, 0, 75))
-        self.rubber_band.setWidth(5)
-
-        # form inputs
-        self.startfrom = 1
-        self.constraints = []
-        self.maxrecords = int(self.settings.value("/QarcConnect/returnRecords", 10))
-        self.timeout = int(self.settings.value("/QarcConnect/timeout", 10))
-        self.disable_ssl_verification = self.settings.value(
-            "/QarcConnect/disableSSL", False, bool
-        )
-        self.log_debugging_messages = self.settings.value(
-            "/QarcConnect/logDebugging", False, bool
-        )
-
-        # Services tab
-        self.cmbConnectionsServices.activated.connect(self.save_connection)
-        self.cmbConnectionsSearch.activated.connect(self.save_connection)
-        self.btnServerInfo.clicked.connect(self.connection_info)
-        self.btnAddDefault.clicked.connect(self.add_default_connections)
-        self.btnRawAPIResponse.clicked.connect(self.show_api)
-        self.tabWidget.currentChanged.connect(self.populate_connection_list)
-
-        # server management buttons
-        self.btnNew.clicked.connect(self.add_connection)
-        self.btnEdit.clicked.connect(self.edit_connection)
-        self.btnDelete.clicked.connect(self.delete_connection)
-        self.btnLoad.clicked.connect(self.load_connections)
-        self.btnSave.clicked.connect(save_connections)
-
-        # Search tab
-        self.treeRecords.itemSelectionChanged.connect(self.record_clicked)
-        self.treeRecords.itemDoubleClicked.connect(self.show_metadata)
-        self.btnSearch.clicked.connect(self.search)
-        self.leKeywords.returnPressed.connect(self.search)
-        # prevent dialog from closing upon pressing enter
-        self.buttonBox.button(QDialogButtonBox.StandardButton.Close).setAutoDefault(
-            False
-        )
-        # launch help from button
-        self.buttonBox.helpRequested.connect(self.help)
-        self.btnCanvasBbox.setAutoDefault(False)
-        self.btnCanvasBbox.clicked.connect(self.set_bbox_from_map)
-        self.btnGlobalBbox.clicked.connect(self.set_bbox_global)
-
-        # navigation buttons
-        self.btnFirst.clicked.connect(self.navigate)
-        self.btnPrev.clicked.connect(self.navigate)
-        self.btnNext.clicked.connect(self.navigate)
-        self.btnLast.clicked.connect(self.navigate)
-
-        self.mActionAddWms.triggered.connect(self.add_to_ows)
-        self.mActionAddWfs.triggered.connect(self.add_to_ows)
-        self.mActionAddWcs.triggered.connect(self.add_to_ows)
-        self.mActionAddAms.triggered.connect(self.add_to_ows)
-        self.mActionAddAfs.triggered.connect(self.add_to_ows)
-        self.mActionAddGisFile.triggered.connect(self.add_gis_file)
-        self.btnViewRawAPIResponse.clicked.connect(self.show_api)
-
+        self.disable_ssl_verification = False
+        self.log_debugging_messages = False
         self.manageGui()
 
     def manageGui(self):
@@ -178,13 +111,15 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
             self.settings.setValue("/QarcConnect/disableSSL", bool(state))
             self.disable_ssl_verification = bool(state)
 
-        def _on_debugging_state_change(state):
+        #def _on_debugging_state_change(state):
+        
             self.settings.setValue("/QarcConnect/logDebugging", bool(state))
             self.log_debugging_messages = bool(state)
 
         self.tabWidget.setCurrentIndex(0)
-        self.populate_connection_list()
-        self.btnRawAPIResponse.setEnabled(False)
+        #self.populate_connection_list()
+        
+        #self.btnRawAPIResponse.setEnabled(False)
 
         # load settings
         self.spnRecords.setValue(self.maxrecords)
@@ -194,7 +129,7 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
         self.disableSSLVerification.setChecked(self.disable_ssl_verification)
         self.disableSSLVerification.stateChanged.connect(_on_ssl_state_change)
         self.logDebuggingMessages.setChecked(self.log_debugging_messages)
-        self.logDebuggingMessages.stateChanged.connect(_on_debugging_state_change)
+        #self.logDebuggingMessages.stateChanged.connect(_on_debugging_state_change)
 
         key = "/QarcConnect/%s" % self.cmbConnectionsSearch.currentText()
         self.catalog_url = self.settings.value("%s/url" % key)
@@ -211,249 +146,44 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
 
     # Services tab
 
-    def populate_connection_list(self):
+    
         """populate select box with connections"""
 
         self.settings.beginGroup("/QarcConnect/")
-        self.cmbConnectionsServices.clear()
-        self.cmbConnectionsServices.addItems(self.settings.childGroups())
-        self.cmbConnectionsSearch.clear()
-        self.cmbConnectionsSearch.addItems(self.settings.childGroups())
+        #self.cmbConnectionsServices.clear()
+        #self.cmbConnectionsServices.addItems(self.settings.childGroups())
+        #self.cmbConnectionsSearch.clear()
+        #self.cmbConnectionsSearch.addItems(self.settings.childGroups())
         self.settings.endGroup()
 
-        self.set_connection_list_position()
+        #self.set_connection_list_position()
 
-        if self.cmbConnectionsServices.count() == 0:
-            # no connections - disable various buttons
-            state_disabled = False
-            self.btnSave.setEnabled(state_disabled)
+        #if self.cmbConnectionsServices.count() == 0:
+        #    # no connections - disable various buttons
+        #    state_disabled = False
+        #    self.btnSave.setEnabled(state_disabled)
             # and start with connection tab open
-            self.tabWidget.setCurrentIndex(1)
+        #    self.tabWidget.setCurrentIndex(1)
             # tell the user to add services
-            msg = self.tr(
-                "No services/connections defined. To get "
-                "started with QarcConnect, create a new "
-                "connection by clicking 'New' or click "
-                "'Add default services'."
-            )
-            self.textMetadata.setHtml("<p><h3>%s</h3></p>" % msg)
-        else:
+        #    msg = self.tr(
+        #        "No services/connections defined. To get "
+        #        "started with QarcConnect, create a new "
+        #        "connection by clicking 'New' or click "
+        #        "'Add default services'."
+        #    )
+        #    self.textMetadata.setHtml("<p><h3>%s</h3></p>" % msg)
+        #else:
             # connections - enable various buttons
-            state_disabled = True
+        #    state_disabled = True
 
-        self.btnServerInfo.setEnabled(state_disabled)
-        self.btnEdit.setEnabled(state_disabled)
-        self.btnDelete.setEnabled(state_disabled)
-
-    def set_connection_list_position(self):
-        """set the current index to the selected connection"""
-        to_select = self.settings.value("/QarcConnect/selected")
-        conn_count = self.cmbConnectionsServices.count()
-
-        if conn_count == 0:
-            self.btnDelete.setEnabled(False)
-            self.btnServerInfo.setEnabled(False)
-            self.btnEdit.setEnabled(False)
-
-        # does to_select exist in cmbConnectionsServices?
-        exists = False
-        for i in range(conn_count):
-            if self.cmbConnectionsServices.itemText(i) == to_select:
-                self.cmbConnectionsServices.setCurrentIndex(i)
-                self.cmbConnectionsSearch.setCurrentIndex(i)
-                exists = True
-                break
-
-        # If we couldn't find the stored item, but there are some, default
-        # to the last item (this makes some sense when deleting items as it
-        # allows the user to repeatidly click on delete to remove a whole
-        # lot of items)
-        if not exists and conn_count > 0:
-            # If to_select is null, then the selected connection wasn't found
-            # by QgsSettings, which probably means that this is the first time
-            # the user has used CSWClient, so default to the first in the list
-            # of connetions. Otherwise default to the last.
-            if not to_select:
-                current_index = 0
-            else:
-                current_index = conn_count - 1
-
-            self.cmbConnectionsServices.setCurrentIndex(current_index)
-            self.cmbConnectionsSearch.setCurrentIndex(current_index)
-
-    def save_connection(self):
-        """save connection"""
-
-        caller = self.sender().objectName()
-
-        if caller == "cmbConnectionsServices":  # servers tab
-            current_text = self.cmbConnectionsServices.currentText()
-        elif caller == "cmbConnectionsSearch":  # search tab
-            current_text = self.cmbConnectionsSearch.currentText()
-
-        self.settings.setValue("/QarcConnect/selected", current_text)
-        key = "/QarcConnect/%s" % current_text
-
-        if caller == "cmbConnectionsSearch":  # bind to service in search tab
-            self.catalog_url = self.settings.value("%s/url" % key)
-            self.catalog_username = self.settings.value("%s/username" % key)
-            self.catalog_password = self.settings.value("%s/password" % key)
-            self.catalog_type = self.settings.value("%s/catalog-type" % key)
-
-        if caller == "cmbConnectionsServices":  # clear server metadata
-            self.textMetadata.clear()
-
-        self.btnRawAPIResponse.setEnabled(False)
-
-    def connection_info(self):
-        """show connection info"""
-
-        current_text = self.cmbConnectionsServices.currentText()
-        key = "/QarcConnect/%s" % current_text
-        self.catalog_url = self.settings.value("%s/url" % key)
-        self.catalog_username = self.settings.value("%s/username" % key)
-        self.catalog_password = self.settings.value("%s/password" % key)
-        self.catalog_type = self.settings.value("%s/catalog-type" % key)
-
-        # connect to the server
-        if not self._get_catalog():
-            return
-
-        if self.catalog:  # display service metadata
-            self.btnRawAPIResponse.setEnabled(True)
-            metadata = render_template(
-                "en",
-                self.context,
-                self.catalog.conn,
-                self.catalog.service_info_template,
-            )
-            style = QgsApplication.reportStyleSheet()
-            self.textMetadata.clear()
-            self.textMetadata.document().setDefaultStyleSheet(style)
-            self.textMetadata.setHtml(metadata)
-
-            # clear results and disable buttons in Search tab
-            self.clear_results()
-
-    def add_connection(self):
-        """add new service"""
-
-        conn_new = NewConnectionDialog()
-        conn_new.setWindowTitle(self.tr("New Catalog Service"))
-        if conn_new.exec() == QDialog.DialogCode.Accepted:  # add to service list
-            self.populate_connection_list()
-        self.textMetadata.clear()
-
-    def edit_connection(self):
-        """modify existing connection"""
-
-        current_text = self.cmbConnectionsServices.currentText()
-
-        url = self.settings.value("/QarcConnect/%s/url" % current_text)
-
-        conn_edit = NewConnectionDialog(current_text)
-        conn_edit.setWindowTitle(self.tr("Edit Catalog Service"))
-        conn_edit.leName.setText(current_text)
-        conn_edit.leURL.setText(url)
-        conn_edit.leUsername.setText(
-            self.settings.value("/QarcConnect/%s/username" % current_text)
-        )
-        conn_edit.lePassword.setText(
-            self.settings.value("/QarcConnect/%s/password" % current_text)
-        )
-
-        conn_edit.cmbCatalogType.setCurrentText(
-            self.settings.value("/QarcConnect/%s/catalog-type" % current_text)
-        )
-
-        if conn_edit.exec() == QDialog.DialogCode.Accepted:  # update service list
-            self.populate_connection_list()
-
-    def delete_connection(self):
-        """delete connection"""
-
-        current_text = self.cmbConnectionsServices.currentText()
-
-        key = "/QarcConnect/%s" % current_text
-
-        msg = self.tr("Remove service {0}?").format(current_text)
-
-        result = QMessageBox.question(
-            self,
-            self.tr("Delete Service"),
-            msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if result == QMessageBox.StandardButton.Yes:  # remove service from list
-            self.settings.remove(key)
-            index_to_delete = self.cmbConnectionsServices.currentIndex()
-            self.cmbConnectionsServices.removeItem(index_to_delete)
-            self.cmbConnectionsSearch.removeItem(index_to_delete)
-            self.set_connection_list_position()
-
-    def load_connections(self):
-        """load services from list"""
-
-        ManageConnectionsDialog(1).exec()
-        self.populate_connection_list()
-
-    def add_default_connections(self):
-        """add default connections"""
-
-        filename = os.path.join(
-            self.context.ppath, "resources", "connections-default.xml"
-        )
-
-        doc = get_connections_from_file(self, filename)
-        if doc is None:
-            return
-
-        self.settings.beginGroup("/QarcConnect/")
-        keys = self.settings.childGroups()
-        self.settings.endGroup()
-
-        for server in doc.findall("csw"):
-            name = server.attrib.get("name")
-            # check for duplicates
-            if name in keys:
-                msg = self.tr("{0} exists.  Overwrite?").format(name)
-                res = QMessageBox.warning(
-                    self,
-                    self.tr("Loading connections"),
-                    msg,
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                )
-                if res != QMessageBox.StandardButton.Yes:
-                    continue
-
-            # no dups detected or overwrite is allowed
-            key = "/QarcConnect/%s" % name
-            self.settings.setValue("%s/url" % key, server.attrib.get("url"))
-            self.settings.setValue(
-                "%s/catalog-type" % key,
-                server.attrib.get("catalog-type", "OGC CSW 2.0.2"),
-            )
-
-        self.populate_connection_list()
-
-    # Settings tab
-
-    def set_ows_save_title_ask(self):
-        """save ows save strategy as save ows title, ask if duplicate"""
-
-        self.settings.setValue("/QarcConnect/ows_save_strategy", "title_ask")
-
-    def set_ows_save_title_no_ask(self):
-        """save ows save strategy as save ows title, do NOT ask if duplicate"""
-
-        self.settings.setValue("/QarcConnect/ows_save_strategy", "title_no_ask")
-
-    def set_ows_save_temp_name(self):
-        """save ows save strategy as save with a temporary name"""
-
-        self.settings.setValue("/QarcConnect/ows_save_strategy", "temp_name")
-
+        #self.btnServerInfo.setEnabled(state_disabled)
+        #self.btnEdit.setEnabled(state_disabled)
+        #self.btnDelete.setEnabled(state_disabled)
+    def toggle_password_visibility(self, state):
+        if state == Qt.CheckState.Checked:
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
     # Search tab
 
     def set_bbox_from_map(self):
@@ -468,8 +198,18 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
             src = QgsCoordinateReferenceSystem(crsid)
             dest = QgsCoordinateReferenceSystem("EPSG:4326")
             xform = QgsCoordinateTransform(src, dest, QgsProject.instance())
-            minxy = xform.transform(QgsPointXY(extent.xMinimum(), extent.yMinimum()))
-            maxxy = xform.transform(QgsPointXY(extent.xMaximum(), extent.yMaximum()))
+            minxy = xform.transform(
+                QgsPointXY(
+                    extent.xMinimum(),
+                    extent.yMinimum()
+                )
+            )
+            maxxy = xform.transform(
+                QgsPointXY(
+                    extent.xMaximum(),
+                    extent.xMaximum()
+                )
+            )
             minx, miny = minxy
             maxx, maxy = maxxy
         else:  # EPSG:4326
@@ -534,7 +274,8 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
 
         except Exception as err:
             QMessageBox.warning(
-                self, self.tr("Search error"), self.tr("Search error: {0}").format(err)
+                self, self.tr("Search error"),
+                self.tr("Search error: {0}").format(err)
             )
             return
 
@@ -595,9 +336,6 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
 
         # disable only service buttons
         self.reset_buttons(True, False, False)
-
-        self.rubber_band.reset()
-
         if not self.treeRecords.selectedItems():
             return
 
@@ -635,12 +373,18 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
                 src = QgsCoordinateReferenceSystem("EPSG:4326")
                 dst = self.map.mapSettings().destinationCrs()
                 if src.postgisSrid() != dst.postgisSrid():
-                    ctr = QgsCoordinateTransform(src, dst, QgsProject.instance())
+                    ctr = QgsCoordinateTransform(
+                        src,
+                        dst,
+                        QgsProject.instance()
+                    )
                     try:
                         geom.transform(ctr)
                     except Exception as err:
                         QMessageBox.warning(
-                            self, self.tr("Coordinate Transformation Error"), str(err)
+                            self,
+                            self.tr("Coordinate Transformation Error"),
+                            str(err)
                         )
                 self.rubber_band.setToGeometry(geom, None)
 
@@ -663,12 +407,18 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
             if link_type is not None:
                 link_type = link_type.upper()
 
-            wmswmst_link_types = list(map(str.upper, link_types.WMSWMST_LINK_TYPES))
-            wfs_link_types = list(map(str.upper, link_types.WFS_LINK_TYPES))
-            wcs_link_types = list(map(str.upper, link_types.WCS_LINK_TYPES))
-            ams_link_types = list(map(str.upper, link_types.AMS_LINK_TYPES))
-            afs_link_types = list(map(str.upper, link_types.AFS_LINK_TYPES))
-            gis_file_link_types = list(map(str.upper, link_types.GIS_FILE_LINK_TYPES))
+            wmswmst_link_types = list(map(str.upper, 
+                                          link_types.WMSWMST_LINK_TYPES))
+            wfs_link_types = list(map(str.upper, 
+                                      link_types.WFS_LINK_TYPES))
+            wcs_link_types = list(map(str.upper, 
+                                      link_types.WCS_LINK_TYPES))
+            ams_link_types = list(map(str.upper, 
+                                      link_types.AMS_LINK_TYPES))
+            afs_link_types = list(map(str.upper, 
+                                      link_types.AFS_LINK_TYPES))
+            gis_file_link_types = list(map(str.upper,
+                                           link_types.GIS_FILE_LINK_TYPES))
 
             # if the link type exists, and it is one of the acceptable
             # interactive link types, then set
@@ -721,7 +471,8 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
                     self,
                     self.tr("Navigation"),
                     msg,
-                    (QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel),
+                    (QMessageBox.StandardButton.Ok |
+                     QMessageBox.StandardButton.Cancel),
                 )
                 if res == QMessageBox.StandardButton.Ok:
                     self.startfrom = 1
@@ -736,7 +487,8 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
                     self,
                     self.tr("Navigation"),
                     msg,
-                    (QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel),
+                    (QMessageBox.StandardButton.Ok |
+                     QMessageBox.StandardButton.Cancel),
                 )
                 if res == QMessageBox.StandardButton.Ok:
                     self.startfrom = self.catalog.matches - self.maxrecords + 1
@@ -760,11 +512,16 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
         try:
             with OverrideCursor(Qt.CursorShape.WaitCursor):
                 self.catalog.query_records(
-                    bbox, keywords, limit=self.maxrecords, offset=self.startfrom
+                    bbox,
+                    keywords,
+                    limit=self.maxrecords,
+                    offset=self.startfrom
                 )
         except Exception as err:
             QMessageBox.warning(
-                self, self.tr("Search error"), self.tr("Search error: {0}").format(err)
+                self,
+                self.tr("Search error"),
+                self.tr("Search error: {0}").format(err)
             )
             return
 
@@ -825,7 +582,8 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
             setting_node = QgsSettingsTree.node("connections").childNode(
                 "arcgisfeatureserver"
             )
-            data_url = item_data["afs"].split("FeatureServer")[0] + "FeatureServer"
+            data_url = item_data["afs"].split("FeatureServer")[0]
+            + "FeatureServer"
 
         keys = setting_node.items(dyn_param)
 
@@ -847,14 +605,15 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
                 | QMessageBox.StandardButton.No
                 | QMessageBox.StandardButton.Cancel,
             )
-            if res == QMessageBox.StandardButton.No:  # assign new name with serial
+            if res == QMessageBox.StandardButton.No:  # assign newname w serial
                 sname = serialize_string(sname)
             elif res == QMessageBox.StandardButton.Cancel:
                 return
 
         # no dups detected or overwrite is allowed
         dyn_param.append(sname)
-        setting_node.childSetting("url").setValue(clean_ows_url(data_url), dyn_param)
+        setting_node.childSetting("url").setValue(clean_ows_url(data_url),
+                                                  dyn_param)
 
         # open provider window
         ows_provider = QgsGui.sourceSelectProviderRegistry().createSelectionWidget(
@@ -981,14 +740,6 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
         crd.textMetadata.setHtml(metadata)
         crd.exec()
 
-    def show_api(self):
-        """show API request / response"""
-
-        crd = APIRequestResponseDialog(
-            self.catalog.request, self.catalog.response, self.catalog.format
-        )
-        crd.exec()
-
     def reset_buttons(self, services=True, api=True, navigation=True):
         """Convenience function to disable WMS/WMTS|WFS|WCS buttons"""
 
@@ -1019,7 +770,6 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
         """back out of dialogue"""
 
         QDialog.reject(self)
-        self.rubber_band.reset()
 
     def _get_catalog(self):
         """convenience function to init catalog wrapper"""
@@ -1076,12 +826,6 @@ class QarcConnectDialog(QDialog, BASE_CLASS):
 
             conn = f"{ptype}://{proxy_up}{host}{proxy_port}"
             install_opener(build_opener(ProxyHandler({ptype: conn})))
-
-
-def save_connections():
-    """save servers to list"""
-
-    ManageConnectionsDialog(0).exec()
 
 
 def get_item_data(item, field):
