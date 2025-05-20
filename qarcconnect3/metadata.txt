@@ -1,9 +1,25 @@
 [general]
 name=QarcConnect3
 description=A plugin to make ArcGIS Services more accessible for QGIS users
-version=1.0
+about=QarcConnect enables you to list all your Feature Services as well as Map Services from ArcGIS online and add them to your current project. No need to manually store them anymore.
+
+version=0.9
 qgisMinimumVersion=3.30
-icon=images/QarcConnect.svg
-supportsQt6=no
 author=Riccardo Klinger
-email=riccardo.klinger@gmail.com
+icon=images/QarcConnect.svg
+homepage=https://github.com/riccardoklinger/QarcConnect
+tracker=https://github.com/riccardoklinger/QarcConnect/issues
+repository=https://github.com/riccardoklinger/QarcConnect
+category=Web
+tags=arcgis, AGOL, FeatureServer, Mapserver
+Changelog=0.9 beta release
+
+[about]
+releaseDate=2025-05-20
+experimental=True
+deprecated=False
+qgisMaximumVersion=3.99
+
+[help]
+# optional URL to user documentation or help page
+url=https://github.com/riccardoklinger/QarcConnect/wiki

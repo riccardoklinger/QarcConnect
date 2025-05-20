@@ -7,7 +7,6 @@ from qgis.PyQt.QtWidgets import (
     QProgressDialog,
     QApplication
 )
-from urllib.parse import urlparse, parse_qs
 from PyQt5.QtCore import (
     pyqtSignal,
     QSize,
@@ -323,11 +322,10 @@ class QarcConnect3Dialog(QDialog, Ui_QarcConnect3Dialog):
 
     def get_search_items(self, search_term):
         url = "https://www.arcgis.com/sharing/rest/search"
-        search_term = "working"
         params = {
             "q": f'{search_term} type:"Feature Service"',
             "f": "json",
-            "num": 3,
+            "num": 20,
             "start": 1
         }
         try:
