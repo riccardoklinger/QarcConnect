@@ -1,0 +1,9 @@
+[general]
+name=QarcConnect3
+description=A plugin to make ArcGIS Services more accessible for QGIS users
+version=1.0
+qgisMinimumVersion=3.30
+icon=images/QarcConnect.svg
+supportsQt6=no
+author=Riccardo Klinger
+email=riccardo.klinger@gmail.com

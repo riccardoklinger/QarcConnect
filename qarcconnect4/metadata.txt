@@ -1,0 +1,9 @@
+[general]
+name=QarcConnectQ
+description=A simple QGIS widget plugin with OK/Cancel
+version=1.0
+qgisMinimumVersion=3.30
+icon=images/QarcConnect.svg
+supportsQt6=yes
+author=Your Name
+email=your@email.com
